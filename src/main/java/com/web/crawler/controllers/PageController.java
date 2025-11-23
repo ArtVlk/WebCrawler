@@ -2,14 +2,12 @@ package com.web.crawler.controllers;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
-@RequestMapping("/welcome")
-public class WelcomeController {
+public class PageController {
 
-    @GetMapping
-    public String ViewWelcome() {
+    @GetMapping("/")
+    public String showWelcomePage() {
         return "welcome";
     }
 }

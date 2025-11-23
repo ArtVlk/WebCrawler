@@ -21,6 +21,8 @@
         .welcome-container {
             margin-top: 50px;
             text-align: center;
+            width: 100%;
+            max-width: 800px;
         }
 
         h1 {
@@ -32,57 +34,130 @@
             margin-top: 30px;
         }
 
+        .stats {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            display: none;
+        }
+        .badge-cache { color: green; font-weight: bold; }
+        .badge-web { color: #d93025; font-weight: bold; }
+
         input[type="text"] {
             width: 300px;
-            padding: 10px;
+            padding: 12px;
             font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
         button {
-            padding: 10px 20px;
+            padding: 12px 24px;
             font-size: 1rem;
             margin-left: 10px;
             cursor: pointer;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3367d6;
         }
 
         .results {
             margin-top: 30px;
-            max-width: 800px;
-            text-align: left;
+            width: 100%;
         }
 
         .result-item {
             background-color: #fff;
             border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: left;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            border-left: 4px solid #4285f4;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .result-item h3 {
-            margin: 0 0 5px 0;
-            font-size: 1.2rem;
-            color: #333;
+        .result-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
-        .result-item a {
-            font-size: 0.95rem;
+        .result-title {
+            font-weight: bold;
+            font-size: 1.3rem;
+            color: #1a0dab;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+
+        .result-url {
+            font-size: 0.9rem;
+            color: #006621;
             text-decoration: none;
+            margin-bottom: 10px;
+            display: block;
+            word-break: break-all;
         }
 
-        .result-item p {
+        .result-snippet {
             font-size: 0.95rem;
-            color: #555;
-            margin-top: 10px;
+            color: #545454;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .loading {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
+            padding: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .logout-form {
             margin-top: auto;
             margin-bottom: 20px;
+        }
+
+        .logout-form button {
+            background-color: #dc3545;
+        }
+
+        .logout-form button:hover {
+            background-color: #c82333;
+        }
+
+        @media (max-width: 768px) {
+            .welcome-container {
+                margin-top: 20px;
+                padding: 0 15px;
+            }
+
+            input[type="text"] {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -94,10 +169,12 @@
 
     <div class="search-box">
         <form id="searchForm">
-            <input type="text" name="query" id="query" placeholder="Например: Spring Boot">
+            <input type="text" name="query" id="query" placeholder="Например: Spring Boot" required>
             <button type="submit">Поиск</button>
         </form>
     </div>
+
+    <div id="stats" class="stats"></div>
 
     <div class="results" id="results"></div>
 </div>
@@ -110,58 +187,91 @@
 <script>
     document.getElementById('searchForm').addEventListener('submit', async function (e) {
         e.preventDefault();
-        const query = document.getElementById('query').value;
+        const query = document.getElementById('query').value.trim();
+
+        if (!query) {
+            alert('Пожалуйста, введите поисковый запрос');
+            return;
+        }
+
         const resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = 'Загрузка...';
+        const statsDiv = document.getElementById('stats');
+
+        resultsDiv.innerHTML = '<div class="loading">Поиск статей...</div>';
+        statsDiv.style.display = 'none';
+        statsDiv.innerHTML = '';
 
         const csrfToken = document.querySelector('meta[name="_csrf"]').content;
         const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
-        const response = await fetch('/api/search', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                [csrfHeader]: csrfToken
-            },
-            body: JSON.stringify({ query })
-        });
+        const startTime = performance.now();
 
-        const results = await response.json();
+        try {
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify({ query })
+            });
 
-        resultsDiv.innerHTML = '';
-        if (results.length === 0) {
-            resultsDiv.innerHTML = '<p>Ничего не найдено.</p>';
-            return;
+            if (!response.ok) {
+                throw new Error('Ошибка при выполнении запроса');
+            }
+
+            const results = await response.json();
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(0);
+
+            resultsDiv.innerHTML = '';
+
+            let timeMessage = `Найдено результатов: ${results.length}. Время выполнения: <b>${duration} мс</b>. `;
+
+            if (duration < 150) {
+                timeMessage += '<span class="badge-cache">(🚀 Взято из Redis Кэша)</span>';
+            } else {
+                timeMessage += '<span class="badge-web">(🐢 Загружено из Интернета)</span>';
+            }
+
+            statsDiv.innerHTML = timeMessage;
+            statsDiv.style.display = 'block';
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">По вашему запросу ничего не найдено.</div>';
+                return;
+            }
+
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+
+                const title = document.createElement('div');
+                title.className = 'result-title';
+                title.textContent = result.title;
+
+                const link = document.createElement('a');
+                link.className = 'result-url';
+                link.href = result.url;
+                link.target = '_blank';
+                link.textContent = result.url;
+
+                const snippet = document.createElement('div');
+                snippet.className = 'result-snippet';
+                snippet.textContent = result.snippet;
+
+                item.appendChild(title);
+                item.appendChild(link);
+                item.appendChild(snippet);
+
+                resultsDiv.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Ошибка:', error);
+            resultsDiv.innerHTML = '<div class="no-results">Произошла ошибка при поиске. Пожалуйста, попробуйте еще раз.</div>';
         }
-
-        results.forEach(result => {
-            const item = document.createElement('div');
-            item.className = 'result-item';
-
-            const title = document.createElement('h3');
-            title.textContent = result.title;
-
-            const link = document.createElement('a');
-            link.href = result.url;
-            link.target = '_blank';
-            link.textContent = result.url;
-            link.style.fontSize = '0.85rem';
-            link.style.color = '#0066cc';
-            link.style.textDecoration = 'none';
-            link.style.display = 'block';
-            link.style.marginBottom = '8px';
-
-            const snippet = document.createElement('p');
-            snippet.textContent = result.snippet;
-
-            item.appendChild(title); // Название статьи как заголовок
-            item.appendChild(link); // Ссылка на статью
-            item.appendChild(snippet); // Сниппет
-
-            resultsDiv.appendChild(item);
-        });
-
-
     });
 </script>
 </body>

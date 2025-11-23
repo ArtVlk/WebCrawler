@@ -5,17 +5,14 @@ import com.web.crawler.dto.SearchResult;
 import com.web.crawler.services.WebSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/search")
 @RequiredArgsConstructor
-public class SearchController {
+public class SearchApiController {
 
     private final WebSearchService webSearchService;
 
