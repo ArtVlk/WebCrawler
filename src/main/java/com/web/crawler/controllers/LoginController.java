@@ -1,6 +1,7 @@
 package com.web.crawler.controllers;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +14,9 @@ public class LoginController {
 
     @GetMapping
     public String viewLogin(Authentication auth) {
-        if(auth != null) return "redirect:/welcome";
+        if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
+            return "redirect:/";
+        }
         return "login";
     }
 }

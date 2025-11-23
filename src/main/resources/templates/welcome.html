@@ -1,48 +1,278 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Добро пожаловать</title>
     <style>
         body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
         }
-        
+
         .welcome-container {
+            margin-top: 50px;
             text-align: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #333;
+        }
+
+        .search-box {
+            margin-top: 30px;
+        }
+
+        .stats {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            display: none;
+        }
+        .badge-cache { color: green; font-weight: bold; }
+        .badge-web { color: #d93025; font-weight: bold; }
+
+        input[type="text"] {
+            width: 300px;
+            padding: 12px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            margin-left: 10px;
+            cursor: pointer;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3367d6;
+        }
+
+        .results {
+            margin-top: 30px;
+            width: 100%;
+        }
+
+        .result-item {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            border-left: 4px solid #4285f4;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .result-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .result-title {
+            font-weight: bold;
+            font-size: 1.3rem;
+            color: #1a0dab;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+
+        .result-url {
+            font-size: 0.9rem;
+            color: #006621;
+            text-decoration: none;
+            margin-bottom: 10px;
+            display: block;
+            word-break: break-all;
+        }
+
+        .result-snippet {
+            font-size: 0.95rem;
+            color: #545454;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .loading {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
             padding: 20px;
         }
-        
-        h1 {
-            font-size: 3rem;
-            color: #333;
+
+        .no-results {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .logout-form {
+            margin-top: auto;
             margin-bottom: 20px;
         }
-        
-        p {
-            font-size: 1.2rem;
-            color: #666;
-            max-width: 600px;
-            margin: 0 auto;
+
+        .logout-form button {
+            background-color: #dc3545;
+        }
+
+        .logout-form button:hover {
+            background-color: #c82333;
+        }
+
+        @media (max-width: 768px) {
+            .welcome-container {
+                margin-top: 20px;
+                padding: 0 15px;
+            }
+
+            input[type="text"] {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin-left: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="welcome-container">
-        <h1>Добро пожаловать!</h1>
-        <p>Мы рады приветствовать вас на нашем сайте. </p>
+
+<div class="welcome-container">
+    <h1>Добро пожаловать!</h1>
+    <p>Введите поисковый запрос для поиска статей на Википедии</p>
+
+    <div class="search-box">
+        <form id="searchForm">
+            <input type="text" name="query" id="query" placeholder="Например: Spring Boot" required>
+            <button type="submit">Поиск</button>
+        </form>
     </div>
 
-    <form th:action="@{/logout}" method="post">
-        <button type="submit">Выйти</button>
-        <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
-    </form>
+    <div id="stats" class="stats"></div>
+
+    <div class="results" id="results"></div>
+</div>
+
+<form class="logout-form" th:action="@{/logout}" method="post">
+    <button type="submit">Выйти</button>
+    <input type="hidden" name="_csrf" th:value="${_csrf.token}" />
+</form>
+
+<script>
+    document.getElementById('searchForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const query = document.getElementById('query').value.trim();
+
+        if (!query) {
+            alert('Пожалуйста, введите поисковый запрос');
+            return;
+        }
+
+        const resultsDiv = document.getElementById('results');
+        const statsDiv = document.getElementById('stats');
+
+        resultsDiv.innerHTML = '<div class="loading">Поиск статей...</div>';
+        statsDiv.style.display = 'none';
+        statsDiv.innerHTML = '';
+
+        const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+        const startTime = performance.now();
+
+        try {
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify({ query })
+            });
+
+            if (!response.ok) {
+                throw new Error('Ошибка при выполнении запроса');
+            }
+
+            const results = await response.json();
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(0);
+
+            resultsDiv.innerHTML = '';
+
+            let timeMessage = `Найдено результатов: ${results.length}. Время выполнения: <b>${duration} мс</b>. `;
+
+            if (duration < 150) {
+                timeMessage += '<span class="badge-cache">(🚀 Взято из Redis Кэша)</span>';
+            } else {
+                timeMessage += '<span class="badge-web">(🐢 Загружено из Интернета)</span>';
+            }
+
+            statsDiv.innerHTML = timeMessage;
+            statsDiv.style.display = 'block';
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">По вашему запросу ничего не найдено.</div>';
+                return;
+            }
+
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+
+                const title = document.createElement('div');
+                title.className = 'result-title';
+                title.textContent = result.title;
+
+                const link = document.createElement('a');
+                link.className = 'result-url';
+                link.href = result.url;
+                link.target = '_blank';
+                link.textContent = result.url;
+
+                const snippet = document.createElement('div');
+                snippet.className = 'result-snippet';
+                snippet.textContent = result.snippet;
+
+                item.appendChild(title);
+                item.appendChild(link);
+                item.appendChild(snippet);
+
+                resultsDiv.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Ошибка:', error);
+            resultsDiv.innerHTML = '<div class="no-results">Произошла ошибка при поиске. Пожалуйста, попробуйте еще раз.</div>';
+        }
+    });
+</script>
 </body>
 </html>
